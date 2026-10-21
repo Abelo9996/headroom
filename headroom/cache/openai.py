@@ -421,9 +421,7 @@ class OpenAICacheOptimizer(BaseCacheOptimizer):
                 leading = len(line) - len(line.lstrip())
                 # Collapse multiple spaces in content (not indentation)
                 content_part = " ".join(stripped.split())
-                normalized_lines.append(
-                    " " * leading + content_part[leading:] if leading else content_part
-                )
+                normalized_lines.append(line[:leading] + content_part)
             else:
                 normalized_lines.append("")
 
