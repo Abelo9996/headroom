@@ -1106,6 +1106,9 @@ def _call_llm(
     if model.startswith("claude"):
         api_base = "https://api.anthropic.com"
 
+    from headroom.offline import guard_egress
+
+    guard_egress(f"{model} API for headroom learn session analysis", api_base)
     response = litellm.completion(
         model=model,
         messages=[
