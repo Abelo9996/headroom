@@ -1792,6 +1792,47 @@ class TestLearnAndMemoryEvalOffline:
         assert _refused_hostname(excinfo.value) == "api.anthropic.com"
         assert litellm_calls == []
 
+    @pytest.fixture
+    def cli_calls(self, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+        """Record the provider-CLI delegate and fail on any spawned process."""
+        from headroom.learn import analyzer
+
+        calls: list[str] = []
+
+        def no_process(*args: object, **kwargs: object) -> None:
+            raise AssertionError(f"learn spawned a provider CLI: {args!r}")
+
+        def fake_cli(digest: str, model: str, on_progress: object = None) -> dict:
+            calls.append(model)
+            return {"context_file_rules": []}
+
+        monkeypatch.setattr(analyzer, "_call_cli_llm", fake_cli)
+        monkeypatch.setattr(analyzer, "Popen", no_process)
+        monkeypatch.setattr(analyzer, "run", no_process)
+        monkeypatch.setattr(analyzer.subprocess, "Popen", no_process)
+        monkeypatch.setattr(analyzer.subprocess, "run", no_process)
+        return calls
+
+    @pytest.mark.parametrize("model", ["claude-cli", "gemini-cli", "codex-cli", "agy-cli"])
+    def test_learn_cli_analysis_is_refused_before_the_cli_runs(
+        self, offline: None, no_sockets: None, cli_calls: list[str], model: str
+    ) -> None:
+        from headroom.learn import analyzer
+
+        assert model in analyzer._CLI_MODEL_IDS
+        with pytest.raises(OfflineEgressBlocked, match=model):
+            analyzer._call_llm("digest", model)
+        assert cli_calls == []
+
+    def test_learn_cli_analysis_still_runs_online(
+        self, monkeypatch: pytest.MonkeyPatch, cli_calls: list[str]
+    ) -> None:
+        from headroom.learn import analyzer
+
+        monkeypatch.delenv("HEADROOM_OFFLINE", raising=False)
+        assert analyzer._call_llm("digest", "claude-cli") == {"context_file_rules": []}
+        assert cli_calls == ["claude-cli"]
+
     def test_learn_verbosity_llm_judge_is_refused(
         self, offline: None, no_sockets: None, litellm_calls: list[dict]
     ) -> None:
@@ -2157,6 +2198,7 @@ _EGRESS_CALLEES = re.compile(
       | (?:openai\.)?(?:Async)?(?:OpenAI|AzureOpenAI)  # provider SDKs build their own
       | (?:anthropic\.)?(?:Async)?Anthropic(?:Bedrock|Vertex)?
       | litellm\.a?completion                          # litellm-routed provider calls
+      | _call_cli_llm                                  # learn's provider CLIs call their APIs
     )$""",
     re.VERBOSE,
 )
