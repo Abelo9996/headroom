@@ -89,6 +89,22 @@ class TestOpenAICacheOptimizer:
         result = optimizer.optimize(messages, context)
         assert result.messages[0]["content"] == code
 
+    def test_whitespace_normalization_keeps_first_line_indentation(self, optimizer, context):
+        """A prompt that starts with an indented line keeps that indentation."""
+        code = "    if ready:\n        run()"
+        assert optimizer._normalize_whitespace(code) == code
+
+        # Surrounding blank lines and trailing whitespace are still trimmed.
+        padded = "\n  \n    if ready:\n        run()   \n\n"
+        assert optimizer._normalize_whitespace(padded) == code
+
+        messages = [
+            {"role": "system", "content": code},
+            {"role": "user", "content": "Hello!"},
+        ]
+        result = optimizer.optimize(messages, context)
+        assert result.messages[0]["content"] == code
+
     def test_optimize_disabled(self, context):
         """Test optimization when disabled."""
         config = CacheConfig(enabled=False)

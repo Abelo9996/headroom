@@ -432,7 +432,9 @@ class OpenAICacheOptimizer(BaseCacheOptimizer):
             while "\n\n\n" in result:
                 result = result.replace("\n\n\n", "\n\n")
 
-        return result.strip()
+        # Lines are already right-stripped and blank lines are empty, so only
+        # surrounding newlines remain; keep the first line's indentation.
+        return result.strip("\n")
 
     def _format_dynamic_section(
         self,
