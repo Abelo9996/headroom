@@ -113,6 +113,7 @@ from headroom.providers.claude import (
 )
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
 from headroom.providers.codex import build_launch_env as _build_codex_launch_env
+from headroom.providers.codex.config_toml import loads_codex_config
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -3086,7 +3087,7 @@ def _codex_session_launch_settings(
     """Build process-local routing while preserving the selected provider id."""
     config_file, _ = _codex_config_paths()
     try:
-        config = tomllib.loads(_read_text(config_file)) if config_file.exists() else {}
+        config = loads_codex_config(_read_text(config_file)) if config_file.exists() else {}
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise click.ClickException(
             f"could not read Codex config for session routing: {exc}"
@@ -3718,10 +3719,10 @@ def _inject_codex_provider_config(port: int) -> str | None:
             # name a line the user never wrote. Only the user's part has to
             # parse: stripping a stale Headroom block may be what repairs it.
             try:
-                tomllib.loads(content)
+                loads_codex_config(content)
             except tomllib.TOMLDecodeError:
                 try:
-                    tomllib.loads(original)
+                    loads_codex_config(original)
                     reason = "it is no longer valid TOML once Headroom's block is removed"
                 except tomllib.TOMLDecodeError as exc:
                     reason = f"it is not valid TOML ({exc})"
@@ -3769,7 +3770,7 @@ def _inject_codex_provider_config(port: int) -> str | None:
             )
 
         # Never replace a usable config with a malformed generated candidate.
-        tomllib.loads(content)
+        loads_codex_config(content)
         _write_text(config_file, content)
         click.echo(f"  Codex config: injected Headroom provider (WS + HTTP) into {config_file}")
         if custom_upstream_base_url:
@@ -4066,7 +4067,7 @@ def _inject_memory_mcp_config(user_id: str) -> None:
             content = mcp_section
 
         # Never replace a usable config with a malformed generated candidate.
-        tomllib.loads(content)
+        loads_codex_config(content)
         _write_text(config_file, content)
         click.echo(f"  Memory MCP: registered in {config_file}")
     except Exception as e:

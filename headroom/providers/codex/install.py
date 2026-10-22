@@ -21,6 +21,7 @@ from headroom._subprocess import run
 from headroom.install.models import ConfigScope, DeploymentManifest, ManagedMutation, ToolTarget
 from headroom.install.paths import codex_config_path
 
+from .config_toml import loads_codex_config
 from .runtime import proxy_base_url
 from .threads import retag_to_headroom, retag_to_native
 
@@ -65,7 +66,7 @@ print(key, end="")
 
 def _codex_credential_store(config_dir: Path) -> str | None:
     try:
-        config = tomllib.loads((config_dir / "config.toml").read_text(encoding="utf-8"))
+        config = loads_codex_config((config_dir / "config.toml").read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return None
     store = config.get("cli_auth_credentials_store")
@@ -261,7 +262,7 @@ def codex_auth_helper_is_referenced(content: str, helper_path: str) -> bool | No
     the helper instead of risking deletion of a pre-existing user file.
     """
     try:
-        document = tomllib.loads(content)
+        document = loads_codex_config(content)
     except (tomllib.TOMLDecodeError, TypeError):
         return None
 
@@ -411,7 +412,7 @@ def apply_provider_scope(manifest: DeploymentManifest) -> ManagedMutation | None
     existing = _CODEX_PATTERN.sub("", existing)
     existing = _strip_root_provider_assignments(existing)
     merged = _insert_block_at_root(existing, section)
-    tomllib.loads(merged)
+    loads_codex_config(merged)
     path.write_text(merged, encoding="utf-8")
     # Pull existing native threads into the headroom-provider menu so Codex's
     # history list stays whole once it routes through Headroom. Best-effort.

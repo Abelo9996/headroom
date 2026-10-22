@@ -1564,6 +1564,38 @@ def test_codex_session_launch_settings_keep_routing_process_local(
     assert config_file.read_text(encoding="utf-8") == original_config
 
 
+def test_codex_session_launch_settings_accept_multiline_inline_table(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # #4378: Codex accepts an inline table split across lines.
+    _set_test_home(monkeypatch, tmp_path)
+    codex_home = tmp_path / "custom-codex-home"
+    codex_home.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(codex_home))
+    monkeypatch.setattr(wrap_mod, "_project_name_from_cwd", lambda: None)
+    config_file = codex_home / "config.toml"
+    original_config = (
+        'model = "gpt-5"\n\n'
+        "[mcp_servers.dingtalk]\n"
+        'command = "npx"\n'
+        "env = {\n"
+        '  DINGTALK_Client_ID = "**********",\n'
+        "  \n"
+        "    }\n"
+    )
+    config_file.write_text(original_config, encoding="utf-8")
+
+    args, env, _ = wrap_mod._codex_session_launch_settings(
+        port=9898,
+        codex_args=("exec", "hello"),
+        environ={"CODEX_HOME": str(codex_home)},
+    )
+
+    assert args[:2] == ("--config", 'openai_base_url="http://127.0.0.1:9898/v1"')
+    assert env["OPENAI_BASE_URL"] == "http://127.0.0.1:9898/v1"
+    assert config_file.read_text(encoding="utf-8") == original_config
+
+
 def test_codex_session_launch_settings_preserve_custom_provider_identity(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

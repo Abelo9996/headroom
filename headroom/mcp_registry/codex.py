@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from headroom import fsutil
+from headroom.providers.codex.config_toml import loads_codex_config
 
 from .base import (
     MCPRegistrar,
@@ -121,7 +122,7 @@ def _only_server_changed(old: str, new: str, server_name: str) -> bool:
     makes this False and the rewrite is refused instead of written.
     """
     try:
-        before, after = tomllib.loads(old), tomllib.loads(new)
+        before, after = loads_codex_config(old), loads_codex_config(new)
     except tomllib.TOMLDecodeError:
         return False
     return _without_server(before, server_name) == _without_server(after, server_name)
@@ -255,7 +256,7 @@ class _TomlMarkerRegistrar(MCPRegistrar):
             # Read via fsutil (UTF-8 with locale fallback) so a config that a
             # tool wrote in the system locale (e.g. GBK) still parses instead
             # of failing tomllib's UTF-8 requirement. See #733.
-            data = tomllib.loads(fsutil.read_text(self._config_file))
+            data = loads_codex_config(fsutil.read_text(self._config_file))
         except (tomllib.TOMLDecodeError, OSError):
             return {}
         return data if isinstance(data, dict) else {}
@@ -276,7 +277,7 @@ class _TomlMarkerRegistrar(MCPRegistrar):
         if not raw.strip():
             return None
         try:
-            data = tomllib.loads(fsutil.read_text(self._config_file))
+            data = loads_codex_config(fsutil.read_text(self._config_file))
         except (tomllib.TOMLDecodeError, OSError) as exc:
             return f"{self._config_file} is not valid TOML ({exc})"
         if not isinstance(data, dict):

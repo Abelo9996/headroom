@@ -58,6 +58,7 @@ from headroom.install.state import ManifestError, load_manifest, save_manifest
 from headroom.install.supervisors import start_supervisor
 from headroom.providers.claude import TOOL_SEARCH_DEFAULT, TOOL_SEARCH_ENV
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
+from headroom.providers.codex.config_toml import loads_codex_config
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -347,7 +348,7 @@ def _codex_init_provider_snapshot(content: str) -> str | None:
     snapshot = json.loads(match.group(1))
     if not isinstance(snapshot, str):
         raise ValueError("Invalid Headroom init provider snapshot")
-    tomllib.loads(snapshot)
+    loads_codex_config(snapshot)
     return snapshot
 
 
@@ -482,7 +483,7 @@ def _ensure_codex_provider(path: Path, port: int) -> None:
         content, _CODEX_PROVIDER_MARKER_START, _CODEX_PROVIDER_MARKER_END, block, at_root=True
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    tomllib.loads(content)
+    loads_codex_config(content)
     fsutil.write_text(path, content)
     # Codex filters its history menu by the active model_provider, so existing
     # native threads vanish once we switch to "headroom". Retag them to match the
@@ -511,7 +512,7 @@ def _codex_features(content: str) -> dict[str, Any] | None:
     if not content.strip():
         return None
     try:
-        parsed = tomllib.loads(content)
+        parsed = loads_codex_config(content)
     except tomllib.TOMLDecodeError:
         return None
     features = parsed.get("features")
