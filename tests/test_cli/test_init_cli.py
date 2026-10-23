@@ -661,6 +661,35 @@ def test_ensure_codex_provider_preserves_profile_overrides(monkeypatch, tmp_path
     assert parsed["profiles"]["work"]["openai_base_url"] == "https://azure.example/v1"
 
 
+def test_ensure_codex_provider_preserves_multiline_inline_profile_overrides(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A profile in a multi-line inline table (TOML 1.1) keeps its provider."""
+    from headroom.providers.codex.config_toml import loads_codex_config
+
+    init_cli, _ = _load_init_module(monkeypatch)
+    path = tmp_path / "config.toml"
+    path.write_text(
+        'model_provider = "openai"\n'
+        "profiles = {\n"
+        "  work = {\n"
+        '    model_provider = "company",\n'
+        '    openai_base_url = "https://company.example/v1",\n'
+        "  },\n"
+        "}\n",
+        encoding="utf-8",
+    )
+
+    init_cli._ensure_codex_provider(path, 8787)
+
+    parsed = loads_codex_config(path.read_text(encoding="utf-8"))
+    assert parsed["model_provider"] == "headroom"
+    assert parsed["profiles"]["work"] == {
+        "model_provider": "company",
+        "openai_base_url": "https://company.example/v1",
+    }
+
+
 def test_ensure_codex_provider_emits_requires_openai_auth_for_chatgpt(
     monkeypatch, tmp_path: Path
 ) -> None:

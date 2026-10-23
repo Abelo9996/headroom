@@ -846,6 +846,27 @@ class TestSubscriptionRouting:
         content = (tmp_path / ".codex" / "config.toml").read_text(encoding="utf-8")
         assert 'openai_base_url = "http://127.0.0.1:8787/v1"' in content
 
+    def test_inject_preserves_multiline_inline_profile_overrides(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Keys nested in a multi-line inline profiles table are not root keys."""
+        from headroom.providers.codex.config_toml import loads_codex_config
+
+        _set_test_home(monkeypatch, tmp_path)
+        config_file = tmp_path / ".codex" / "config.toml"
+        config_file.parent.mkdir(parents=True)
+        config_file.write_text(
+            'profiles = {\n  work = {\n    model_provider = "company",\n  },\n}\n',
+            encoding="utf-8",
+        )
+
+        wrap_mod._inject_codex_provider_config(8787)
+
+        parsed = loads_codex_config(config_file.read_text(encoding="utf-8"))
+        assert parsed["model_provider"] == "headroom"
+        assert parsed["openai_base_url"] == "http://127.0.0.1:8787/v1"
+        assert parsed["profiles"]["work"] == {"model_provider": "company"}
+
     def test_inject_emits_requires_openai_auth_for_chatgpt(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

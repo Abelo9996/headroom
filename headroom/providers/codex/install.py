@@ -21,7 +21,7 @@ from headroom._subprocess import run
 from headroom.install.models import ConfigScope, DeploymentManifest, ManagedMutation, ToolTarget
 from headroom.install.paths import codex_config_path
 
-from .config_toml import loads_codex_config
+from .config_toml import loads_codex_config, root_assignment_lines
 from .runtime import proxy_base_url
 from .threads import retag_to_headroom, retag_to_native
 
@@ -370,19 +370,18 @@ def _insert_block_at_root(content: str, block: str) -> str:
 
 
 def _strip_root_provider_assignments(content: str) -> str:
-    """Remove root provider assignments without touching table-scoped settings."""
-    lines = content.splitlines(keepends=True)
-    kept: list[str] = []
-    in_root = True
-    for line in lines:
-        if in_root and _TOML_TABLE_HEADER_RE.search(line):
-            in_root = False
-        if in_root and (
-            _ROOT_MODEL_PROVIDER_RE.match(line) or _ROOT_OPENAI_BASE_URL_RE.match(line)
-        ):
-            continue
-        kept.append(line)
-    return "".join(kept)
+    """Remove root provider assignments without touching table-scoped settings.
+
+    Keys nested in a multi-line inline table (e.g. a ``profiles = {`` override)
+    are not root assignments and are kept.
+    """
+    root_lines = root_assignment_lines(content)
+    return "".join(
+        line
+        for index, line in enumerate(content.splitlines(keepends=True))
+        if index not in root_lines
+        or not (_ROOT_MODEL_PROVIDER_RE.match(line) or _ROOT_OPENAI_BASE_URL_RE.match(line))
+    )
 
 
 def apply_provider_scope(manifest: DeploymentManifest) -> ManagedMutation | None:

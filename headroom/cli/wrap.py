@@ -113,7 +113,7 @@ from headroom.providers.claude import (
 )
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
 from headroom.providers.codex import build_launch_env as _build_codex_launch_env
-from headroom.providers.codex.config_toml import loads_codex_config
+from headroom.providers.codex.config_toml import loads_codex_config, root_assignment_lines
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -3348,19 +3348,28 @@ def _redirect_existing_top_level_keys(content: str, port: int) -> str:
 
         return _replace
 
-    redirected = content
+    # Only root assignments: the same keys inside [profiles.*] tables or a
+    # multi-line inline ``profiles = {`` table are the user's per-profile routing.
+    lines = content.splitlines(keepends=True)
+    root_lines = sorted(root_assignment_lines(content))
     for key in _REDIRECTABLE_KEYS:
-        pattern = re.compile(rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*"(?P<value>[^"\n]*)"[^\n]*')
-        redirected = pattern.sub(_make_replacer(key, port), redirected, count=1)
-    return redirected
+        pattern = re.compile(rf'[ \t]*{re.escape(key)}[ \t]*=[ \t]*"(?P<value>[^"\n]*)"[^\n]*')
+        replace = _make_replacer(key, port)
+        for index in root_lines:
+            match = pattern.match(lines[index])
+            if match:
+                lines[index] = replace(match) + lines[index][match.end() :]
+                break
+    return "".join(lines)
 
 
 def _has_redirectable_top_level_key(content: str, key: str) -> bool:
     """Return True if ``content`` declares ``key = "..."`` as a top-level key."""
     import re  # local import to match the module's existing convention
 
-    pattern = re.compile(rf'(?m)^[ \t]*{key}[ \t]*=[ \t]*"[^"\n]*"')
-    return pattern.search(content) is not None
+    pattern = re.compile(rf'[ \t]*{key}[ \t]*=[ \t]*"[^"\n]*"')
+    lines = content.splitlines(keepends=True)
+    return any(pattern.match(lines[index]) for index in root_assignment_lines(content))
 
 
 def _codex_config_has_headroom_markers(content: str) -> bool:

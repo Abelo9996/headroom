@@ -58,7 +58,7 @@ from headroom.install.state import ManifestError, load_manifest, save_manifest
 from headroom.install.supervisors import start_supervisor
 from headroom.providers.claude import TOOL_SEARCH_DEFAULT, TOOL_SEARCH_ENV
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
-from headroom.providers.codex.config_toml import loads_codex_config
+from headroom.providers.codex.config_toml import loads_codex_config, root_assignment_lines
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -92,6 +92,7 @@ _STARTUP_READY_TIMEOUT_SECONDS = 15
 # report ready, and every session is permanently cold.
 _HOOK_ENSURE_TIMEOUT_SECONDS = 60
 _TOML_TABLE_HEADER_RE = re.compile(r"^[ \t]*(?:\[\[[^\]\r\n]+\]\]|\[[^\]\r\n]+\])[ \t]*(?:#.*)?$")
+_ROOT_PROVIDER_KEY_RE = re.compile(r"[ \t]*(?:model_provider|openai_base_url)[ \t]*=")
 _TOML_FEATURES_NAME_RE = r"(?:features|\"features\"|'features')"
 _TOML_CODEX_HOOKS_NAME_RE = r"(?:codex_hooks|\"codex_hooks\"|'codex_hooks')"
 _CODEX_FEATURES_TABLE_RE = re.compile(
@@ -471,12 +472,14 @@ def _ensure_codex_provider(path: Path, port: int) -> None:
     # first table header) -- these keys also appear legitimately inside
     # [profiles.*] tables as per-profile overrides, and stripping them there
     # silently reroutes the user's profiles to the injected "headroom" default.
-    _first_table = re.search(r"(?m)^[ \t]*\[", content)
-    _split = _first_table.start() if _first_table else len(content)
-    root, rest = content[:_split], content[_split:]
-    root = re.sub(r"(?m)^[ \t]*model_provider[ \t]*=.*\r?\n", "", root)
-    root = re.sub(r"(?m)^[ \t]*openai_base_url[ \t]*=.*\r?\n", "", root)
-    content = root + rest
+    # Lines nested in a multi-line inline table (e.g. ``profiles = {``) are
+    # profile overrides too, so only true root assignments are dropped.
+    _root_lines = root_assignment_lines(content)
+    content = "".join(
+        line
+        for index, line in enumerate(content.splitlines(keepends=True))
+        if index not in _root_lines or not _ROOT_PROVIDER_KEY_RE.match(line)
+    )
     # The provider block carries top-level keys (model_provider, openai_base_url),
     # so it must land at the document root rather than after a trailing table (#260).
     content = _replace_marker_block(

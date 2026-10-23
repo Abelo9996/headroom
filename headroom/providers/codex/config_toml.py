@@ -30,3 +30,57 @@ def loads_codex_config(content: str) -> dict[str, Any]:
             return tomlkit.parse(content).unwrap()
         except TOMLKitError:
             raise exc from None
+
+
+def root_assignment_lines(content: str) -> set[int]:
+    """Return indexes of the lines that start a key/value pair at the document root.
+
+    Indexes refer to ``content.splitlines(keepends=True)``. Only lines before
+    the first table header count, and a line inside a multi-line inline table,
+    array, or string is skipped, so a key nested in a multi-line inline table
+    (TOML 1.1, e.g. ``profiles = {\\n  work = { model_provider = ... } }``) is
+    never mistaken for a root key.
+    """
+    roots: set[int] = set()
+    depth = 0
+    open_string: str | None = None  # delimiter of an open multi-line string
+    for index, line in enumerate(content.splitlines(keepends=True)):
+        if depth == 0 and open_string is None:
+            stripped = line.lstrip(" \t")
+            if stripped.startswith("["):
+                break  # first table header ends the root
+            if stripped and stripped[0] not in "#\r\n":
+                roots.add(index)
+        pos = 0
+        while pos < len(line):
+            if open_string is not None:
+                if line.startswith(open_string, pos):
+                    pos += 3
+                    # Up to two quotes may directly precede the closing delimiter.
+                    for _ in range(2):
+                        if pos < len(line) and line[pos] == open_string[0]:
+                            pos += 1
+                    open_string = None
+                elif open_string == '"""' and line[pos] == "\\":
+                    pos += 2
+                else:
+                    pos += 1
+                continue
+            char = line[pos]
+            if char == "#":
+                break
+            if line.startswith('"""', pos) or line.startswith("'''", pos):
+                open_string = line[pos : pos + 3]
+                pos += 3
+            elif char in "\"'":
+                pos += 1
+                while pos < len(line) and line[pos] not in (char, "\n"):
+                    pos += 2 if char == '"' and line[pos] == "\\" else 1
+                pos += 1
+            else:
+                if char in "[{":
+                    depth += 1
+                elif char in "]}" and depth:
+                    depth -= 1
+                pos += 1
+    return roots
