@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from headroom import fsutil
-from headroom.providers.codex.config_toml import loads_codex_config
+from headroom.providers.codex.config_toml import loads_codex_config, split_toml_lines
 
 from .base import (
     MCPRegistrar,
@@ -85,7 +85,7 @@ def _evict_foreign_tables(content: str, server_name: str, start: str, end: str) 
     move, so a header-like line inside a multi-line string can split a table
     wrongly; callers must check the final result with ``_only_server_changed``.
     """
-    lines = content.splitlines(keepends=True)
+    lines = split_toml_lines(content, keepends=True)
     try:
         i = next(n for n, line in enumerate(lines) if line.rstrip("\r\n") == start)
         j = next(n for n in range(i + 1, len(lines)) if lines[n].rstrip("\r\n") == end)

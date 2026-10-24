@@ -145,6 +145,22 @@ def test_provider_scope_preserves_multiline_inline_profile_overrides(
     assert parsed["profiles"]["work"] == {"model_provider": "company"}
 
 
+@pytest.mark.parametrize("sep", [" ", "\x85"])
+def test_provider_scope_keeps_single_line_string_with_unicode_separator(
+    tmp_path: Path, monkeypatch, sep: str
+) -> None:
+    config = tmp_path / "config.toml"
+    notes = f'hello{sep}model_provider = "company"{sep}world'
+    config.write_text(f"notes = '{notes}'\n\n[features]\nhooks = true\n", encoding="utf-8")
+    monkeypatch.setattr("headroom.providers.codex.install.codex_config_path", lambda: config)
+
+    apply_provider_scope(_manifest(tmp_path))
+
+    parsed = loads_codex_config(config.read_text(encoding="utf-8"))
+    assert parsed["notes"] == notes
+    assert parsed["model_provider"] == "headroom"
+
+
 def test_persistent_install_helper_collision_preserves_config(tmp_path: Path, monkeypatch) -> None:
     config = tmp_path / "config.toml"
     auth = tmp_path / "auth.json"

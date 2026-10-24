@@ -58,7 +58,11 @@ from headroom.install.state import ManifestError, load_manifest, save_manifest
 from headroom.install.supervisors import start_supervisor
 from headroom.providers.claude import TOOL_SEARCH_DEFAULT, TOOL_SEARCH_ENV
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
-from headroom.providers.codex.config_toml import loads_codex_config, root_assignment_lines
+from headroom.providers.codex.config_toml import (
+    loads_codex_config,
+    root_assignment_lines,
+    split_toml_lines,
+)
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -300,7 +304,7 @@ def _replace_marker_block(
         # The block carries top-level keys, so it must sit above the first table
         # header; appended after a table (e.g. [features]) TOML scopes those keys
         # into that table and Codex rejects the config (#260).
-        lines = content.splitlines()
+        lines = split_toml_lines(content)
         for index, line in enumerate(lines):
             if _TOML_TABLE_HEADER_RE.search(line):
                 head = "\n".join(lines[:index]).rstrip()
@@ -477,7 +481,7 @@ def _ensure_codex_provider(path: Path, port: int) -> None:
     _root_lines = root_assignment_lines(content)
     content = "".join(
         line
-        for index, line in enumerate(content.splitlines(keepends=True))
+        for index, line in enumerate(split_toml_lines(content, keepends=True))
         if index not in _root_lines or not _ROOT_PROVIDER_KEY_RE.match(line)
     )
     # The provider block carries top-level keys (model_provider, openai_base_url),
@@ -527,7 +531,7 @@ def _codex_features_has_hooks(content: str) -> bool:
     if features is None:
         # Keep init resilient for already-invalid user configs; this fallback
         # only needs to avoid adding a second obvious hooks line.
-        lines = content.splitlines()
+        lines = split_toml_lines(content)
         features_index = _codex_features_table_index(lines)
         if features_index is None:
             return False
@@ -542,7 +546,7 @@ def _codex_features_has_hooks(content: str) -> bool:
 
 
 def _strip_codex_legacy_feature_flag(content: str) -> str:
-    lines = content.splitlines(keepends=True)
+    lines = split_toml_lines(content, keepends=True)
     retained: list[str] = []
     in_features = False
     in_root = True
@@ -592,7 +596,7 @@ def _ensure_codex_feature_flag(path: Path) -> None:
         # the only work.
         pass
     else:
-        lines = content.splitlines()
+        lines = split_toml_lines(content)
         features_index = _codex_features_table_index(lines)
         if features_index is not None:
             # Leading blank line matches the normalisation _replace_marker_block

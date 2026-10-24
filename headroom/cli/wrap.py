@@ -113,7 +113,11 @@ from headroom.providers.claude import (
 )
 from headroom.providers.claude.runtime import TOOL_SEARCH_FOUNDRY_DEFAULT
 from headroom.providers.codex import build_launch_env as _build_codex_launch_env
-from headroom.providers.codex.config_toml import loads_codex_config, root_assignment_lines
+from headroom.providers.codex.config_toml import (
+    loads_codex_config,
+    root_assignment_lines,
+    split_toml_lines,
+)
 from headroom.providers.codex.install import (
     CodexAuthConfigError,
     build_codex_auth_config,
@@ -3350,7 +3354,7 @@ def _redirect_existing_top_level_keys(content: str, port: int) -> str:
 
     # Only root assignments: the same keys inside [profiles.*] tables or a
     # multi-line inline ``profiles = {`` table are the user's per-profile routing.
-    lines = content.splitlines(keepends=True)
+    lines = split_toml_lines(content, keepends=True)
     root_lines = sorted(root_assignment_lines(content))
     for key in _REDIRECTABLE_KEYS:
         pattern = re.compile(rf'[ \t]*{re.escape(key)}[ \t]*=[ \t]*"(?P<value>[^"\n]*)"[^\n]*')
@@ -3368,7 +3372,7 @@ def _has_redirectable_top_level_key(content: str, key: str) -> bool:
     import re  # local import to match the module's existing convention
 
     pattern = re.compile(rf'[ \t]*{key}[ \t]*=[ \t]*"[^"\n]*"')
-    lines = content.splitlines(keepends=True)
+    lines = split_toml_lines(content, keepends=True)
     return any(pattern.match(lines[index]) for index in root_assignment_lines(content))
 
 

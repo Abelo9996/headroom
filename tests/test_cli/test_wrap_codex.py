@@ -1159,6 +1159,14 @@ class TestInjectAvoidsDuplicateTopLevelKeys:
         # the marker-delimited top-level block.
         assert wrap_mod._redirect_existing_top_level_keys(blank, 8787) == blank
 
+    @pytest.mark.parametrize("sep", [" ", "\x85"])
+    def test_redirect_leaves_provider_text_inside_single_line_string(self, sep: str) -> None:
+        # TOML allows U+2028 and U+0085 inside a single-line string, so the
+        # text after them is still part of the value, not a root assignment.
+        content = f"notes = 'hello{sep}model_provider = \"company\"{sep}world'\n"
+        assert wrap_mod._redirect_existing_top_level_keys(content, 8787) == content
+        assert not wrap_mod._has_redirectable_top_level_key(content, "model_provider")
+
     def test_inject_preserves_user_value_in_trailing_comment(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

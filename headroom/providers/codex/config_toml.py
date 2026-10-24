@@ -32,10 +32,26 @@ def loads_codex_config(content: str) -> dict[str, Any]:
             raise exc from None
 
 
+def split_toml_lines(content: str, keepends: bool = False) -> list[str]:
+    """Split ``content`` like ``str.splitlines``, but only at TOML newlines.
+
+    TOML ends a line at LF or CRLF only. ``str.splitlines`` also breaks at
+    characters such as U+2028 and U+0085, which TOML allows inside a
+    single-line string or comment, so its pieces are not always TOML lines.
+    """
+    lines = [line + "\n" for line in content.split("\n")]
+    lines[-1] = lines[-1][:-1]
+    if not lines[-1]:
+        lines.pop()
+    if keepends:
+        return lines
+    return [line.removesuffix("\n").removesuffix("\r") for line in lines]
+
+
 def root_assignment_lines(content: str) -> set[int]:
     """Return indexes of the lines that start a key/value pair at the document root.
 
-    Indexes refer to ``content.splitlines(keepends=True)``. Only lines before
+    Indexes refer to ``split_toml_lines(content)``. Only lines before
     the first table header count, and a line inside a multi-line inline table,
     array, or string is skipped, so a key nested in a multi-line inline table
     (TOML 1.1, e.g. ``profiles = {\\n  work = { model_provider = ... } }``) is
@@ -44,7 +60,7 @@ def root_assignment_lines(content: str) -> set[int]:
     roots: set[int] = set()
     depth = 0
     open_string: str | None = None  # delimiter of an open multi-line string
-    for index, line in enumerate(content.splitlines(keepends=True)):
+    for index, line in enumerate(split_toml_lines(content, keepends=True)):
         if depth == 0 and open_string is None:
             stripped = line.lstrip(" \t")
             if stripped.startswith("["):

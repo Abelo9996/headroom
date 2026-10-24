@@ -21,7 +21,7 @@ from headroom._subprocess import run
 from headroom.install.models import ConfigScope, DeploymentManifest, ManagedMutation, ToolTarget
 from headroom.install.paths import codex_config_path
 
-from .config_toml import loads_codex_config, root_assignment_lines
+from .config_toml import loads_codex_config, root_assignment_lines, split_toml_lines
 from .runtime import proxy_base_url
 from .threads import retag_to_headroom, retag_to_native
 
@@ -359,7 +359,7 @@ def _insert_block_at_root(content: str, block: str) -> str:
     root instead.
     """
     block = block.strip()
-    lines = content.splitlines()
+    lines = split_toml_lines(content)
     for index, line in enumerate(lines):
         if _TOML_TABLE_HEADER_RE.search(line):
             head = "\n".join(lines[:index]).rstrip()
@@ -378,7 +378,7 @@ def _strip_root_provider_assignments(content: str) -> str:
     root_lines = root_assignment_lines(content)
     return "".join(
         line
-        for index, line in enumerate(content.splitlines(keepends=True))
+        for index, line in enumerate(split_toml_lines(content, keepends=True))
         if index not in root_lines
         or not (_ROOT_MODEL_PROVIDER_RE.match(line) or _ROOT_OPENAI_BASE_URL_RE.match(line))
     )
