@@ -27,7 +27,7 @@ def loads_codex_config(content: str) -> dict[str, Any]:
         return cast("dict[str, Any]", tomllib.loads(content))
     except tomllib.TOMLDecodeError as exc:
         try:
-            return tomlkit.parse(content).unwrap()
+            return cast("dict[str, Any]", tomlkit.parse(content).unwrap())
         except TOMLKitError:
             raise exc from None
 
